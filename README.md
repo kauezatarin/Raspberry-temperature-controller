@@ -23,4 +23,4 @@ This script is to help you to control your raspberry pi temperature.
 
 ###Version 1.6.5:
 
--added fullstat option that displays all collected system infos.
+-added fullstat option that displays all collected system infos. ==> To Do
