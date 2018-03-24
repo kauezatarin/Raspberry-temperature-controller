@@ -10,18 +10,19 @@ import signal
 import time
 import optparse
 import MemoryUtils as utils
+import ConfigUtils as configs
 
 #VARIAVEIS GLOBAIS
 counter = 0 #contador auxiliar
 shutdown = False #killswitch
-version = 1.0
+version = 1.5
 
 #CONFIGURACOES
-fanPort = 7 #porta onde o rele esta conectado
-minFanUpTime = 5 * 60 #tempo minimo que a fan deve ficar ligada em segundos
-refreshRate = 3 #tempo de monitoramento da temperatura em segundos
-maxTemp = 55.00 #temperatura em que a fan ira ligar
-minTemp = 45.00 #temperatura minima em que a fan ira desligar
+fanPort = None
+minFanUpTime = None
+refreshRate = None
+maxTemp = None
+minTemp  = None
 
 #pega a temperatura da CPU
 def getTemp():
@@ -43,9 +44,9 @@ def installAutoInit():
 	with open("/etc/rc.local","r") as fin:
 		with open("/etc/rc.local.TMP","w") as fout:
 			for line in fin:
-				if(line != "sudo nohup python %s -a &\n" % (os.path.abspath(__file__))):
+				if(line != "sudo nohup python -u %s -a &\n" % (os.path.abspath(__file__))):
 					if (line == "exit 0\n" or line == "exit 0"):
-						fout.write("sudo nohup python %s -a &\n\n" % (os.path.abspath(__file__)))
+						fout.write("sudo nohup python -u %s -a &\n\n" % (os.path.abspath(__file__)))
 						
 					fout.write(line)
 
@@ -65,7 +66,7 @@ def uninstallAutoInit():
 	with open("/etc/rc.local","r") as fin:
 		with open("/etc/rc.local.TMP","w") as fout:
 			for line in fin:
-				if(line != "sudo nohup python %s -a &\n" % (os.path.abspath(__file__))):						
+				if(line != "sudo nohup python -u %s -a &\n" % (os.path.abspath(__file__))):						
 					fout.write(line)
 				elif(secondLine == True):
 					if(line != "\n"):
@@ -108,10 +109,16 @@ def main():
 	global maxTemp
 	global minTemp
 	
+#	Carrega as configura??es	
+	(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp) = configs.loadConfig()
+	
 	parser = optparse.OptionParser()
 	
 	parser.add_option("-v", "--version", action="store_true", dest="version",
                   help="Show the software version.", default = False)
+				  
+	parser.add_option("-c", "--config", action="store_true", dest="config",
+                  help="Generates a default config file. WARNING: this can overwrite existing settings file.", default = False)
 	
 	group = optparse.OptionGroup(parser, "Controll Options")
 	
@@ -161,7 +168,17 @@ def main():
 #	para o processo caso o computador comece a desligar
 	signal.signal(signal.SIGTERM, stop)
 	
-	if(options.version ==  True):
+	if(options.config == True):
+		try:
+			configs.createConfig()
+			print('Config file created.')
+		
+		except:
+			print('Fail to create the config file.')
+			
+		sys.exit()
+		
+	elif(options.version ==  True):
 		print("Fan version: %s" % (version))
 		sys.exit()
 		
