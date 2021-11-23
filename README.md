@@ -23,4 +23,18 @@ This script is to help you to control your raspberry pi temperature.
 
 ### Version 1.6.5:
 
--added fullstat option that displays all collected system infos. ==> To Do
+-added installer bash script to install tempController script.
+-prepared the code to be compatible with NPN and Reley fan activation mode.
+
+### Version 1.7:
+
+-added fullstat option that displays all collected system infos.
+-added option to choose between transistor and relay fan activation mode.
+
+### version 1.7.5:
+
+-added the option to get the temperature directly fom the raspberry pi soc.
+
+### version 1.8:
+
+-migrated the script to python 3.7

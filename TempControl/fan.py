@@ -18,9 +18,12 @@ import datetime
 # VARIAVEIS GLOBAIS
 counter = 0 #contador auxiliar
 shutdown = False #killswitch
-version = "1.6"
+version = "1.8"
 channel = None
 lastUpdate = datetime.datetime.now()
+# transistor => onValue = 1 and offValue = 0; relay=> offValue = 0 and offValue = 1;
+onValue = 1
+offValue = 0
 
 # CONFIGURACOES
 fanPort = None
@@ -31,30 +34,42 @@ minTemp  = None
 channel_id = None # id do canal thingspeak
 write_key  = None # chave de escrita do canal
 tskrefresh = 15 # tempo de refresh do thingspeak em segundos
+isRelay = False # determina se o acionamento da fan ser? acionada utilizando reles
+useSocCmd = False # determina se a temperatura sera obtida diretamente do SoC do raspberry pi, oferece uma maior precisao
 
 # pega a temperatura da CPU
 def getTemp():
-	file = open("/sys/class/thermal/thermal_zone0/temp","r")
-	temp = (float(file.readline()))/1000	
-	file.close()
+	if(useSocCmd):
+		temp = getTempSoc()
+	else:
+		file = open("/sys/class/thermal/thermal_zone0/temp","r")
+		temp = (float(file.readline()))/1000	
+		file.close()
 	
 	return temp
+
+# pega a temperatura utilizando o comando Soc
+def getTempSoc():
+	stream = os.popen("vcgencmd measure_temp")
+	tempText = stream.readlines()
+	
+	return float(tempText[0][5:-3])
 
 # adiciona o comando 'fan' a linha de comando
 def installFan():
 	file = open("/usr/local/bin/fan","w")
-	file.write("sudo python %s $1 $2" % (os.path.abspath(__file__))) 
+	file.write("sudo python3 %s $1 $2" % (os.path.abspath(__file__))) 
 	file.close()
-	os.chmod("/usr/local/bin/fan", 0777)
+	os.chmod("/usr/local/bin/fan", 0o777)
 
 # instala a inicializa??o automatica do processo
 def installAutoInit():
 	with open("/etc/rc.local","r") as fin:
 		with open("/etc/rc.local.TMP","w") as fout:
 			for line in fin:
-				if(line != "sudo nohup python -u %s -a &\n" % (os.path.abspath(__file__))):
+				if(line != "sudo nohup python3 -u %s -a &\n" % (os.path.abspath(__file__))):
 					if (line == "exit 0\n" or line == "exit 0"):
-						fout.write("sudo nohup python -u %s -a &\n\n" % (os.path.abspath(__file__)))
+						fout.write("sudo nohup python3 -u %s -a &\n\n" % (os.path.abspath(__file__)))
 						
 					fout.write(line)
 
@@ -65,7 +80,7 @@ def installAutoInit():
 	os.rename('/etc/rc.local.TMP', '/etc/rc.local')
 	
 	#add the needed permissions
-	os.chmod("/etc/rc.local", 0777)
+	os.chmod("/etc/rc.local", 0o777)
 
 # desinstala a inicializa??o automatica do processo
 def uninstallAutoInit():
@@ -74,7 +89,7 @@ def uninstallAutoInit():
 	with open("/etc/rc.local","r") as fin:
 		with open("/etc/rc.local.TMP","w") as fout:
 			for line in fin:
-				if(line != "sudo nohup python -u %s -a &\n" % (os.path.abspath(__file__))):						
+				if(line != "sudo nohup python3 -u %s -a &\n" % (os.path.abspath(__file__))):						
 					fout.write(line)
 				elif(secondLine == True):
 					if(line != "\n"):
@@ -89,12 +104,12 @@ def uninstallAutoInit():
 	os.rename('/etc/rc.local.TMP', '/etc/rc.local')
 	
 	#add the needed permissions
-	os.chmod("/etc/rc.local", 0777)
+	os.chmod("/etc/rc.local", 0o777)
 
 # recebe o sinal de shutdown do sistema
 def stop(sig, frame):
-    global shutdown
-    shutdown = True
+	global shutdown
+	shutdown = True
 
 # inicializa a GPIO
 def setGPIO():
@@ -140,13 +155,24 @@ def reloadConfigs():
 	global write_key
 	global tskrefresh
 	global channel
+	global isRelay
+	global onValue
+	global offValue
+	global useSocCmd
 	
 	lastFanPort = fanPort
 	
-	(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh) = configs.loadConfig()
+	(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,isRelay,useSocCmd) = configs.loadConfig()
 	
 	if(channel_id != -1):
 		channel = thingspeak.Channel(id=channel_id,write_key=write_key)
+	
+	if(isRelay):
+		onValue = 0
+		offValue = 1
+	else:
+		onValue = 1
+		offValue = 0
 	
 	GPIO.cleanup(lastFanPort)
 	setGPIO()
@@ -166,9 +192,20 @@ def main():
 	global tskrefresh
 	global lastUpdate
 	global channel
+	global isRelay
+	global onValue
+	global offValue
+	global useSocCmd
 	
 #	Carrega as configura??es	
-	(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh) = configs.loadConfig()
+	(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,isRelay,useSocCmd) = configs.loadConfig()
+	
+	if(isRelay):
+		onValue = 0
+		offValue = 1
+	else:
+		onValue = 1
+		offValue = 0
 	
 	if(channel_id != -1):
 		channel = thingspeak.Channel(id=channel_id,write_key=write_key)
@@ -319,14 +356,14 @@ def main():
 	elif (options.appear):
 		setGPIO()
 #		desliga a fan
-		GPIO.output(fanPort,1)
+		GPIO.output(fanPort,offValue)
 	
 	elif(options.force == "on"):
 		try:
 			fanForce = sysv_ipc.SharedMemory(22061995) #procura a memoria compartilhada
 			utils.write_to_memory(fanForce,"on")
 			setGPIO()
-			GPIO.output(fanPort,0)
+			GPIO.output(fanPort,onValue)
 			print("The Fan was forced to be on.")
 		except:
 			print("Fail forcing fan to be on.")
@@ -338,7 +375,7 @@ def main():
 			fanForce = sysv_ipc.SharedMemory(22061995) #procura a memoria compartilhada
 			utils.write_to_memory(fanForce,"off")
 			setGPIO()
-			GPIO.output(fanPort,1)
+			GPIO.output(fanPort,offValue)
 			print("The Fan was forced to be off. WARNING: The fan will not auto turn on anymore.")
 		except:
 			print("Fail forcing fan to be off.")
@@ -365,14 +402,14 @@ def main():
 		
 	elif(options.fanstatus):
 		setGPIO()
-		if(GPIO.input(fanPort)):
+		if(GPIO.input(fanPort) == offValue):
 			print("The fan is inactive.")
 		else:
 			print("The fan is active.")
 		sys.exit()
 	
 	elif(options.temp):
-		print ("Temperature: %0.2f ºC" % (getTemp()))
+		print ("Temperature: %0.2f 'C" % (getTemp()))
 		sys.exit()
 		
 	else:
@@ -397,9 +434,9 @@ def main():
 			if(utils.read_from_memory(fanForce) == "default"):
 #				se a temperatura for maior ou igual a maxTemp graus liga a fan
 				if (getTemp() >= maxTemp):
-					if(status == 1):
+					if(status == offValue):
 #						liga a fan
-						GPIO.output(fanPort,0)
+						GPIO.output(fanPort,onValue)
 #						envia o status para o thingspeak
 						
 						k=0
@@ -445,8 +482,8 @@ def main():
 									utils.write_to_memory(configReload,"default")
 				
 				else:
-					if(status == 0):
-						GPIO.output(fanPort,1)
+					if(status == onValue):
+						GPIO.output(fanPort,offValue)
 						
 					updateThingspeak()
 					if(utils.read_from_memory(configReload) == "reload"):
@@ -471,6 +508,10 @@ def main():
 		
 #chama a funcao principal caso o scrips seja chamado via console
 if __name__ == "__main__":
+
+	if sys.version_info[0] < 3:
+		print ("This program needs python 3.x or higher")
+		sys.exit()
 	
 	user = os.getenv("SUDO_USER")
 	
