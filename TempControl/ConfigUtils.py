@@ -31,6 +31,8 @@ def createConfig():
 	config.set('FAN', 'useSocCmd', 'False')
 	config.set('FAN', 'maxTemp', '55.00')
 	config.set('FAN', 'minTemp', '45.00')
+	config.set('FAN', '#Turning tis option to "True" ignores the temperature settings and let the fan always on.')
+	config.set('FAN', 'alwaysOn', 'False')
 	config.set('FAN', '#If you use an relay to activate your fan, turn tis option to "True".')
 	config.set('FAN', 'isRelay', 'False')
 	
@@ -57,6 +59,7 @@ def loadConfig():
 	global channel_id
 	global write_key
 	global tskrefresh
+	global alwaysOn
 	global isRelay
 	global useSocCmd
 	
@@ -71,6 +74,7 @@ def loadConfig():
 		refreshRate = config.getint('FAN','refreshRate')
 		maxTemp = config.getfloat('FAN','maxTemp')
 		minTemp = config.getfloat('FAN','minTemp')
+		alwaysOn = config.getboolean('FAN','alwaysOn')
 		isRelay = config.getboolean('FAN','isRelay')
 		useSocCmd = config.getboolean('FAN','useSocCmd')
 		
@@ -81,7 +85,7 @@ def loadConfig():
 	except:
 		pass
 	
-	return (fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,isRelay,useSocCmd)
+	return (fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,alwaysOn,isRelay,useSocCmd)
 	
 def printConfigs():
 	

@@ -18,7 +18,7 @@ import datetime
 # VARIAVEIS GLOBAIS
 counter = 0 #contador auxiliar
 shutdown = False #killswitch
-version = "1.8"
+version = "1.9"
 channel = None
 lastUpdate = datetime.datetime.now()
 # transistor => onValue = 1 and offValue = 0; relay=> offValue = 0 and offValue = 1;
@@ -155,6 +155,7 @@ def reloadConfigs():
 	global write_key
 	global tskrefresh
 	global channel
+	global alwaysOn
 	global isRelay
 	global onValue
 	global offValue
@@ -162,7 +163,7 @@ def reloadConfigs():
 	
 	lastFanPort = fanPort
 	
-	(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,isRelay,useSocCmd) = configs.loadConfig()
+	(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,alwaysOn,isRelay,useSocCmd) = configs.loadConfig()
 	
 	if(channel_id != -1):
 		channel = thingspeak.Channel(id=channel_id,write_key=write_key)
@@ -192,13 +193,14 @@ def main():
 	global tskrefresh
 	global lastUpdate
 	global channel
+	global alwaysOn
 	global isRelay
 	global onValue
 	global offValue
 	global useSocCmd
 	
 #	Carrega as configura??es	
-	(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,isRelay,useSocCmd) = configs.loadConfig()
+	(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,alwaysOn,isRelay,useSocCmd) = configs.loadConfig()
 	
 	if(isRelay):
 		onValue = 0
@@ -432,8 +434,17 @@ def main():
 			status = GPIO.input(fanPort)
 #			se receber um comando de force via console para de rodar
 			if(utils.read_from_memory(fanForce) == "default"):
+
+				if (alwaysOn):
+					if(status == offValue):
+						GPIO.output(fanPort,onValue)
+
+					updateThingspeak()
+					time.sleep(refreshRate)
+					counter=0
+
 #				se a temperatura for maior ou igual a maxTemp graus liga a fan
-				if (getTemp() >= maxTemp):
+				elif (getTemp() >= maxTemp):
 					if(status == offValue):
 #						liga a fan
 						GPIO.output(fanPort,onValue)

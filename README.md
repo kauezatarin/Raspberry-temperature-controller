@@ -38,3 +38,7 @@ This script is to help you to control your raspberry pi temperature.
 ### version 1.8:
 
 -migrated the script to python 3.7
+
+### version 1.9:
+
+-added the option to mantain the fan always on via config file
