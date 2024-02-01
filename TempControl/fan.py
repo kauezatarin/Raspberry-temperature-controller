@@ -14,11 +14,11 @@ import MemoryUtils as utils
 import ConfigUtils as configs
 import thingspeak
 import datetime
+from _version import __version__
 
 # VARIAVEIS GLOBAIS
 counter = 0 #contador auxiliar
 shutdown = False #killswitch
-version = "1.9"
 channel = None
 lastUpdate = datetime.datetime.now()
 # transistor => onValue = 1 and offValue = 0; relay=> offValue = 0 and offValue = 1;
@@ -294,7 +294,7 @@ def main():
 		sys.exit()
 		
 	elif(options.version):
-		print("Fan version: %s" % (version))
+		print("Fan version: %s" % (__version__))
 		sys.exit()
 		
 	elif(options.clear):
