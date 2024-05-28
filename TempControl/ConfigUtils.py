@@ -8,6 +8,7 @@ minFanUpTime = 5 * 60 #tempo minimo que a fan deve ficar ligada em segundos
 refreshRate = 3 #tempo de monitoramento da temperatura em segundos
 maxTemp = 55.00 #temperatura em que a fan ira ligar
 minTemp = 45.00 #temperatura minima em que a fan ira desligar
+alwaysOn = False #determina se a ventoinha estará sempre ligada
 channel_id = -1 # id do canal thingspeak
 write_key  = -1 # chave de escrita do canal
 tskrefresh = 15 # tempo de atualização do thingspeak
