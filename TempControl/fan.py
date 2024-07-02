@@ -172,8 +172,10 @@ def reloadConfigs():
 	global useSocCmd
 	global usePwm
 	global fanSpeed
+	global pwm
 	
 	lastFanPort = fanPort
+	lasUsePwm = usePwm
 	
 	(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,alwaysOn,isRelay,useSocCmd,usePwm,fanSpeed) = configs.loadConfig()
 	
@@ -183,11 +185,16 @@ def reloadConfigs():
 	if(isRelay):
 		onValue = 0
 		offValue = 1
+		usePwm = False
 	else:
 		onValue = 1
 		offValue = 0
 	
 	GPIO.cleanup(lastFanPort)
+	if lasUsePwm:
+		pwm.stop()
+
+	print(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,alwaysOn,isRelay,useSocCmd,usePwm,fanSpeed)
 	setGPIO()
 
 def setFanSpeed(speed:float):
@@ -365,6 +372,9 @@ def main():
 			print("There was no memory to clear.")
 		
 		GPIO.cleanup(fanPort)
+		if usePwm:
+			pwm.stop()
+
 		print("GPIO Cleared.")
 			
 		sys.exit()
@@ -489,7 +499,6 @@ def main():
 		while (shutdown == False):
 #			descobre se a fan esta ligada
 			isFanStatusOn = isFanOn()
-
 #			se receber um comando de force via console para de rodar
 			if(utils.read_from_memory(fanForce) == "default"):
 				if (alwaysOn):
@@ -559,7 +568,6 @@ def main():
 									utils.write_to_memory(configReload,"default")
 									
 					time.sleep(refreshRate)
-					print("passou aqui 3")
 			else:
 				updateThingspeak()
 				if(utils.read_from_memory(configReload) == "reload"):
@@ -572,6 +580,9 @@ def main():
 	
 	finally:
 		GPIO.cleanup(fanPort)
+		if usePwm:
+			pwm.stop()
+
 		sysv_ipc.remove_shared_memory(fanForce.id)
 		sysv_ipc.remove_shared_memory(configReload.id)
 		
@@ -588,8 +599,7 @@ if __name__ == "__main__":
 		print ("This program needs 'sudo'")
 		sys.exit()
 	else:
-		main()
-		# try:
-		# 	main()
-		# except Exception as e:
-		# 	print(e)
+		try:
+			main()
+		except Exception as e:
+			print(e)

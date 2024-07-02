@@ -55,7 +55,7 @@ def createConfig():
 	return
 	
 def loadConfig():
-#(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,isRelay,useSocCmd,usePwm,fanSpeed) = configs.loadConfig()
+#(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,alwaysOn,isRelay,useSocCmd,usePwm,fanSpeed) = configs.loadConfig()
 
 	global fanPort
 	global minFanUpTime
