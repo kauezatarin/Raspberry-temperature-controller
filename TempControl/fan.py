@@ -130,6 +130,10 @@ def setGPIO():
 	GPIO.setup(fanPort, GPIO.OUT)
 
 	if usePwm:
+		if pwm is not None:
+			pwm.stop()
+			pwm = None
+			
 		pwm = GPIO.PWM(fanPort, 20)
 		pwm.start(0)
 		isPwmOn = False

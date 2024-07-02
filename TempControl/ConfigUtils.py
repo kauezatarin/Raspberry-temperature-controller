@@ -86,7 +86,7 @@ def loadConfig():
 		isRelay = config.getboolean('FAN','isRelay')
 		useSocCmd = config.getboolean('FAN','useSocCmd')
 		usePwm = config.getboolean('FAN','usePwm')
-		fanSpeed = config.getboolean('FAN','fanSpeed')
+		fanSpeed = config.getfloat('FAN','fanSpeed')
 		
 		channel_id = config.getint('TSK','channel_id')
 		write_key = config.get('TSK', 'write_key')
