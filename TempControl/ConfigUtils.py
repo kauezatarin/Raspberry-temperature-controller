@@ -14,6 +14,8 @@ write_key  = -1 # chave de escrita do canal
 tskrefresh = 15 # tempo de atualização do thingspeak
 isRelay = False # determina se o acionamento da fan será acionada utilizando reles
 useSocCmd = False # determina se a temperatura sera obtida diretamente do SoC do raspberry pi, oferece uma maior precisao
+usePwm = True # determina se será controlada a velocidade da ventoinha
+fanSpeed = 100.00 # determina a velociade da ventoinha em %
 
 def createConfig():
 	
@@ -36,6 +38,9 @@ def createConfig():
 	config.set('FAN', 'alwaysOn', 'False')
 	config.set('FAN', '#If you use an relay to activate your fan, turn tis option to "True".')
 	config.set('FAN', 'isRelay', 'False')
+	config.set('FAN', '#Control fan speed. Only works if isRelay is "False".')
+	config.set('FAN', 'usePwm', 'True')
+	config.set('FAN', 'fanSpeed', '100.00')
 	
 	config.set('TSK', '#Put here your Thingspeak channel infos.')
 	config.set('TSK', 'channel_id', '-1')
@@ -50,7 +55,7 @@ def createConfig():
 	return
 	
 def loadConfig():
-#(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,isRelay,useSocCmd) = configs.loadConfig()
+#(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,isRelay,useSocCmd,usePwm,fanSpeed) = configs.loadConfig()
 
 	global fanPort
 	global minFanUpTime
@@ -63,6 +68,8 @@ def loadConfig():
 	global alwaysOn
 	global isRelay
 	global useSocCmd
+	global usePwm
+	global fanSpeed
 	
 	try:
 		filepath = "%s/fanConf.cfg" % (os.path.dirname(os.path.abspath(__file__)))
@@ -78,6 +85,8 @@ def loadConfig():
 		alwaysOn = config.getboolean('FAN','alwaysOn')
 		isRelay = config.getboolean('FAN','isRelay')
 		useSocCmd = config.getboolean('FAN','useSocCmd')
+		usePwm = config.getboolean('FAN','usePwm')
+		fanSpeed = config.getboolean('FAN','fanSpeed')
 		
 		channel_id = config.getint('TSK','channel_id')
 		write_key = config.get('TSK', 'write_key')
@@ -86,7 +95,7 @@ def loadConfig():
 	except:
 		pass
 	
-	return (fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,alwaysOn,isRelay,useSocCmd)
+	return (fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,alwaysOn,isRelay,useSocCmd,usePwm,fanSpeed)
 	
 def printConfigs():
 	

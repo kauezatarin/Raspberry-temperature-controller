@@ -21,6 +21,8 @@ counter = 0 #contador auxiliar
 shutdown = False #killswitch
 channel = None
 lastUpdate = datetime.datetime.now()
+pwm = None
+isPwmOn = False
 # transistor => onValue = 1 and offValue = 0; relay=> offValue = 0 and offValue = 1;
 onValue = 1
 offValue = 0
@@ -36,6 +38,8 @@ write_key  = None # chave de escrita do canal
 tskrefresh = 15 # tempo de refresh do thingspeak em segundos
 isRelay = False # determina se o acionamento da fan ser? acionada utilizando reles
 useSocCmd = False # determina se a temperatura sera obtida diretamente do SoC do raspberry pi, oferece uma maior precisao
+usePwm = True # determina se a velocidade da ventoinha deve ser controlada via PWM
+fanSpeed = 100.00 # determina a velocidade da venotinha em %
 
 # pega a temperatura da CPU
 def getTemp():
@@ -114,6 +118,8 @@ def stop(sig, frame):
 # inicializa a GPIO
 def setGPIO():
 	global fanPort
+	global pwm
+	global usePwm
 
 #	desliga o alarme da GPIO
 	GPIO.setwarnings(False)
@@ -121,6 +127,10 @@ def setGPIO():
 	GPIO.setmode(GPIO.BOARD)
 #	Define os pinos dos leds como saida
 	GPIO.setup(fanPort, GPIO.OUT)
+
+	if usePwm:
+		pwm = GPIO.PWM(fanPort, 20)
+		pwm.start(0)
 
 #envia os dados para o Thingspeak
 def updateThingspeak():
@@ -160,10 +170,12 @@ def reloadConfigs():
 	global onValue
 	global offValue
 	global useSocCmd
+	global usePwm
+	global fanSpeed
 	
 	lastFanPort = fanPort
 	
-	(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,alwaysOn,isRelay,useSocCmd) = configs.loadConfig()
+	(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,alwaysOn,isRelay,useSocCmd,usePwm,fanSpeed) = configs.loadConfig()
 	
 	if(channel_id != -1):
 		channel = thingspeak.Channel(id=channel_id,write_key=write_key)
@@ -177,8 +189,50 @@ def reloadConfigs():
 	
 	GPIO.cleanup(lastFanPort)
 	setGPIO()
+
+def setFanSpeed(speed:float):
+	global pwm
+	global isPwmOn
+
+	if speed == 0:
+		isPwmOn = False
+	else:
+		isPwmOn = True
+
+	pwm.ChangeDutyCycle(speed)
+
+def setFanOn():
+	global usePwm
+	global onValue
+	global fanPort
+	global fanSpeed
+
+	if usePwm:
+		setFanSpeed(fanSpeed)
+	else:
+		GPIO.output(fanPort, onValue)
+
+def setFanOff():
+	global usePwm
+	global offValue
+	global fanPort
+
+	if usePwm:
+		setFanSpeed(0)
+	else:
+		GPIO.output(fanPort, offValue)
+
+def isFanOn():
+	global usePwm
+	global fanPort
+	global isPwmOn
+	global onValue
+
+	if usePwm:
+		return isPwmOn
 	
-			
+	return GPIO.input(fanPort) == onValue
+
 def main():
 #	instacia das variaveis globais
 	global counter
@@ -198,13 +252,17 @@ def main():
 	global onValue
 	global offValue
 	global useSocCmd
-	
+	global usePwm
+	global pwm
+	global fanSpeed
+
 #	Carrega as configura??es	
-	(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,alwaysOn,isRelay,useSocCmd) = configs.loadConfig()
+	(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,alwaysOn,isRelay,useSocCmd,usePwm,fanSpeed) = configs.loadConfig()
 	
 	if(isRelay):
 		onValue = 0
 		offValue = 1
+		usePwm = False # Desliga o PWM para evitar problemas
 	else:
 		onValue = 1
 		offValue = 0
@@ -306,7 +364,6 @@ def main():
 		except:
 			print("There was no memory to clear.")
 		
-
 		GPIO.cleanup(fanPort)
 		print("GPIO Cleared.")
 			
@@ -357,15 +414,14 @@ def main():
 #	se receber o comando -a forca abrir uma instancia nova		
 	elif (options.appear):
 		setGPIO()
-#		desliga a fan
-		GPIO.output(fanPort,offValue)
+		setFanOff()
 	
 	elif(options.force == "on"):
 		try:
 			fanForce = sysv_ipc.SharedMemory(22061995) #procura a memoria compartilhada
 			utils.write_to_memory(fanForce,"on")
 			setGPIO()
-			GPIO.output(fanPort,onValue)
+			setFanOn()
 			print("The Fan was forced to be on.")
 		except:
 			print("Fail forcing fan to be on.")
@@ -377,7 +433,7 @@ def main():
 			fanForce = sysv_ipc.SharedMemory(22061995) #procura a memoria compartilhada
 			utils.write_to_memory(fanForce,"off")
 			setGPIO()
-			GPIO.output(fanPort,offValue)
+			setFanOff()
 			print("The Fan was forced to be off. WARNING: The fan will not auto turn on anymore.")
 		except:
 			print("Fail forcing fan to be off.")
@@ -398,16 +454,17 @@ def main():
 			print("The Fan was restored to auto-mode.")
 
 		except:
-			print("The Fan was restored to auto-mode.")
+			print("The Fan was not able to fully restore to auto-mode. System restart is recommended.")
 		
 		sys.exit()
 		
 	elif(options.fanstatus):
 		setGPIO()
-		if(GPIO.input(fanPort) == offValue):
-			print("The fan is inactive.")
-		else:
+		
+		if(isFanOn()):
 			print("The fan is active.")
+		else:
+			print("The fan is inactive.")
 		sys.exit()
 	
 	elif(options.temp):
@@ -430,14 +487,14 @@ def main():
 	
 	try:
 		while (shutdown == False):
-#			descobre se a fan esta ligada			
-			status = GPIO.input(fanPort)
+#			descobre se a fan esta ligada
+			isFanStatusOn = isFanOn()
+
 #			se receber um comando de force via console para de rodar
 			if(utils.read_from_memory(fanForce) == "default"):
-
 				if (alwaysOn):
-					if(status == offValue):
-						GPIO.output(fanPort,onValue)
+					if(not isFanStatusOn):
+						setFanOn()
 
 					updateThingspeak()
 					time.sleep(refreshRate)
@@ -445,9 +502,9 @@ def main():
 
 #				se a temperatura for maior ou igual a maxTemp graus liga a fan
 				elif (getTemp() >= maxTemp):
-					if(status == offValue):
+					if(not isFanStatusOn):
 #						liga a fan
-						GPIO.output(fanPort,onValue)
+						setFanOn()
 #						envia o status para o thingspeak
 						
 						k=0
@@ -493,8 +550,8 @@ def main():
 									utils.write_to_memory(configReload,"default")
 				
 				else:
-					if(status == onValue):
-						GPIO.output(fanPort,offValue)
+					if(isFanStatusOn):
+						setFanOff()
 						
 					updateThingspeak()
 					if(utils.read_from_memory(configReload) == "reload"):
@@ -502,6 +559,7 @@ def main():
 									utils.write_to_memory(configReload,"default")
 									
 					time.sleep(refreshRate)
+					print("passou aqui 3")
 			else:
 				updateThingspeak()
 				if(utils.read_from_memory(configReload) == "reload"):
@@ -530,7 +588,8 @@ if __name__ == "__main__":
 		print ("This program needs 'sudo'")
 		sys.exit()
 	else:
-		try:
-			main()
-		except Exception as e:
-			print(e)
+		main()
+		# try:
+		# 	main()
+		# except Exception as e:
+		# 	print(e)
