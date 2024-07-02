@@ -120,6 +120,7 @@ def setGPIO():
 	global fanPort
 	global pwm
 	global usePwm
+	global isPwmOn
 
 #	desliga o alarme da GPIO
 	GPIO.setwarnings(False)
@@ -131,6 +132,7 @@ def setGPIO():
 	if usePwm:
 		pwm = GPIO.PWM(fanPort, 20)
 		pwm.start(0)
+		isPwmOn = False
 
 #envia os dados para o Thingspeak
 def updateThingspeak():
@@ -194,7 +196,6 @@ def reloadConfigs():
 	if lasUsePwm:
 		pwm.stop()
 
-	print(fanPort,minFanUpTime,refreshRate,maxTemp,minTemp,channel_id,write_key,tskrefresh,alwaysOn,isRelay,useSocCmd,usePwm,fanSpeed)
 	setGPIO()
 
 def setFanSpeed(speed:float):
@@ -430,8 +431,6 @@ def main():
 		try:
 			fanForce = sysv_ipc.SharedMemory(22061995) #procura a memoria compartilhada
 			utils.write_to_memory(fanForce,"on")
-			setGPIO()
-			setFanOn()
 			print("The Fan was forced to be on.")
 		except:
 			print("Fail forcing fan to be on.")
@@ -442,8 +441,6 @@ def main():
 		try:
 			fanForce = sysv_ipc.SharedMemory(22061995) #procura a memoria compartilhada
 			utils.write_to_memory(fanForce,"off")
-			setGPIO()
-			setFanOff()
 			print("The Fan was forced to be off. WARNING: The fan will not auto turn on anymore.")
 		except:
 			print("Fail forcing fan to be off.")
@@ -524,10 +521,10 @@ def main():
 							if(utils.read_from_memory(fanForce) == "default"):
 #								envia o status para o thingspeak
 								updateThingspeak()
-								
 								if(utils.read_from_memory(configReload) == "reload"):
 									reloadConfigs()
 									utils.write_to_memory(configReload,"default")
+									break
 									
 								time.sleep(1)
 								k+=1
@@ -537,7 +534,7 @@ def main():
 						counter=0
 					else:
 						updateThingspeak()
-						
+
 						if(utils.read_from_memory(configReload) == "reload"):
 									reloadConfigs()
 									utils.write_to_memory(configReload,"default")
@@ -566,10 +563,15 @@ def main():
 					if(utils.read_from_memory(configReload) == "reload"):
 									reloadConfigs()
 									utils.write_to_memory(configReload,"default")
-									
+
 					time.sleep(refreshRate)
+			elif (utils.read_from_memory(fanForce) == "on" and not isFanStatusOn):
+				setFanOn()
+			elif (utils.read_from_memory(fanForce) == "off" and isFanStatusOn):
+				setFanOff()
 			else:
 				updateThingspeak()
+
 				if(utils.read_from_memory(configReload) == "reload"):
 									reloadConfigs()
 									utils.write_to_memory(configReload,"default")
